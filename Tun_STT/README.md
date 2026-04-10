@@ -35,9 +35,9 @@ After transcription, the output passes through a **profanity detection filter** 
 ## 🛠️ How to Run
 
 > [!IMPORTANT]
-> **Run the notebook on Google Colab.** The training/inference pipeline requires at least **10 GB of VRAM** (GPU memory), and the necessary libraries (PyTorch, Whisper, etc.) come pre-installed in the Colab environment.
+> **The notebook is designed to run exclusively on Google Colab** and will only open in the Colab environment. The training/inference pipeline requires at least **10 GB of VRAM** (GPU memory), and the necessary libraries (PyTorch, Whisper, etc.) come pre-installed in Colab.
 
-1. Open the notebook located in this directory on **Google Colab**.
+1. Open the notebook located in this directory directly on **Google Colab**.
 2. Run all cells to load the Whisper-small model, perform transcription, and apply the bad-word filter.
 3. The resulting model/outputs can then be used in the Streamlit demo.
 

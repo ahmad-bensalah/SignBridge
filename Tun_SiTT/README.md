@@ -20,19 +20,6 @@ Sign language is inherently temporal. A single static frame is often ambiguous.
 ### 3. Model Architecture: Temporal Attention
 The core classification model uses a **Temporal Attention Mechanism** implemented in Keras.
 
-```python
-class TemporalAttention(keras.layers.Layer):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.score = keras.layers.Dense(1, activation="tanh")
-
-    def call(self, x):
-        # x shape: (batch, window_size, features)
-        weights = tf.nn.softmax(self.score(x), axis=1)
-        # weighted sum across the temporal dimension
-        return tf.reduce_sum(x * weights, axis=1)
-```
-
 - **Rationale**: Not all frames in a 16-frame window are equally important. Some frames capture the "core" of the sign (the target pose), while others are transitional. The attention layer allows the model to "focus" on the most discriminative frames.
 - **Backend**: The model is trained on a custom TSL dataset containing 100+ common Tunisian signs across categories like Family, Transport, and Destinations.
 
