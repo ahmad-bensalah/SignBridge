@@ -1,59 +1,50 @@
 # 🎧 Tunisian Speech to Text (Tun_STT)
 
-This module provides offline-first, low-latency transcription for the Tunisian Dialect.
+This module provides high-accuracy transcription for the Tunisian Dialect using OpenAI's Whisper model, with an integrated **Tunisian bad-word filter** for safe output.
 
-## ⚙️ Technical Core: Kaldi & Vosk
+## ⚙️ Technical Core: OpenAI Whisper
 
 ### 1. The Engine
-We use **Vosk**, a speech recognition toolkit that allows running the **Kaldi** speech recognition engine in a lightweight, cross-platform package.
-- **Offline Inference**: Unlike cloud APIs (Google Cloud STT, OpenAI Whisper), Vosk runs entirely on the local device, ensuring user privacy and zero bandwidth cost once the model is downloaded.
-- **Kaldi Compatibility**: Uses HMM-GMM and DNN-based acoustic models which are highly efficient for real-time applications.
+We use **Whisper-small**, OpenAI's open-source automatic speech recognition model, which provides robust multilingual transcription capabilities.
+- **Multilingual Support**: Whisper is trained on 680,000 hours of multilingual audio, giving it strong out-of-the-box performance on Arabic dialects including Tunisian Darija.
+- **Transformer Architecture**: Uses an encoder-decoder Transformer that jointly performs speech recognition and language identification, making it naturally suited for code-switched Tunisian speech (Arabic + French loanwords).
 
 ### 2. Tunisian Acoustic Modeling
-The model is optimized to recognize the phonetic characteristics of Tunisian Arabic:
-- **Phoneme Handling**: Specifically tuned for the "Qaf" / "Gaf" distinction and the specific vowel sounds present in Darija.
-- **Noise Robustness**: Incorporates Kaldi's signal processing layers to handle background noise in typical mobile environments (street noise, cafe chatter).
+The model handles the phonetic characteristics of Tunisian Arabic effectively:
+- **Phoneme Handling**: Whisper's large-scale multilingual pretraining allows it to generalize well to the "Qaf" / "Gaf" distinction and the specific vowel sounds present in Darija.
+- **Noise Robustness**: The model's training on diverse audio conditions provides inherent robustness to background noise in typical mobile environments (street noise, cafe chatter).
 
-### 3. Real-time Implementation
-The integration in the platform uses a **streaming recognizer** approach:
-- **Sample Rate**: Optimized for 16kHz or 44.1kHz mono PCM audio.
-- **Chunk-based processing**: Audio frames are processed in 4000-byte chunks to provide "Partial Results" as the user speaks.
-- **Final Result**: Once silence is detected, the engine combines partial hypotheses into a final polished transcript.
+### 3. Implementation
+The integration in the platform processes audio through Whisper's pipeline:
+- **Sample Rate**: Whisper internally resamples all audio to 16kHz mono.
+- **Log-Mel Spectrogram**: Audio is converted into 80-channel log-Mel spectrograms before being fed to the encoder.
+- **Beam Search Decoding**: The decoder uses beam search to produce the final transcript with high accuracy.
 
 ---
 
-## 🛠️ Developer Setup
+## 🚫 Tunisian Bad-Word Filter
 
-### Model Placement
-For the module to work, a Vosk model directory must be present:
-```bash
-# Example structure
-TuniSign-AI/Demo/model/vosk-model/
-├── am/ (acoustic model)
-├── graph/ (language model graph)
-└── conf/
-```
+After transcription, the output passes through a **profanity detection filter** specifically built for Tunisian Darija.
 
-### Script Usage
-```python
-from vosk import Model, KaldiRecognizer
-import wave
+- **Dataset**: The filter uses a curated `.xlsx` dataset containing known Tunisian profane and offensive words/expressions.
+- **Matching**: Each transcribed word is checked against the dataset entries. Matches are flagged or censored before displaying the final text to the user.
+- **Why a dedicated filter?**: Standard Arabic profanity lists do not cover Tunisian slang and dialect-specific insults. This custom dataset ensures culturally accurate content moderation.
 
-model = Model("model/vosk-model")
-wf = wave.open("audio.wav", "rb")
-rec = KaldiRecognizer(model, wf.getframerate())
+---
 
-while True:
-    data = wf.readframes(4000)
-    if len(data) == 0:
-        break
-    if rec.AcceptWaveform(data):
-        print(rec.Result())
-```
+## 🛠️ How to Run
+
+> [!IMPORTANT]
+> **Run the notebook on Google Colab.** The training/inference pipeline requires at least **10 GB of VRAM** (GPU memory), and the necessary libraries (PyTorch, Whisper, etc.) come pre-installed in the Colab environment.
+
+1. Open the notebook located in this directory on **Google Colab**.
+2. Run all cells to load the Whisper-small model, perform transcription, and apply the bad-word filter.
+3. The resulting model/outputs can then be used in the Streamlit demo.
 
 ---
 
 ## 📈 Characteristics
-- **Latency**: < 200ms on standard CPUs.
-- **Binary Size**: Small footprint (~50MB to 300MB depending on the model chosen).
-- **Environment**: Works on Linux, Windows, macOS, Android, and iOS.
+- **Model Size**: ~461MB (Whisper-small, 244M parameters).
+- **Accuracy**: Strong performance on Arabic dialects thanks to multilingual pretraining.
+- **Content Safety**: Integrated Tunisian bad-word filter using a curated `.xlsx` dataset.
+- **Environment**: Works on Linux, Windows, and macOS. GPU acceleration supported via CUDA.

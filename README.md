@@ -1,11 +1,11 @@
-# 🇹🇳 TuniSign AI: Bridging the Gap in Tunisian Communication
+# 🇹🇳 SignBridge: Bridging the Gap in Tunisian Communication
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=Streamlit&logoColor=white)](https://streamlit.io/)
 [![Mediapipe](https://img.shields.io/badge/Mediapipe-00C853?style=flat&logo=google&logoColor=white)](https://google.github.io/mediapipe/)
 [![Keras](https://img.shields.io/badge/Keras-D00000?style=flat&logo=Keras&logoColor=white)](https://keras.io/)
 
-**TuniSign AI** is a comprehensive accessibility platform designed to break communication barriers between the deaf and hearing communities in Tunisia. By leveraging state-of-the-art Deep Learning models, the platform provides seamless bidirectional translation between **Tunisian Dialect (Darija)** and **Tunisian Sign Language (TSL)**.
+**SignBridge** is a comprehensive accessibility platform designed to break communication barriers between the deaf and hearing communities in Tunisia. By leveraging state-of-the-art Deep Learning models, the platform provides seamless bidirectional translation between **Tunisian Dialect (Darija)** and **Tunisian Sign Language (TSL)**.
 
 ---
 
@@ -57,8 +57,8 @@ graph TD
 - **[Deep Dive Into Tun_TTS](./Tun_TTS/)**
 
 ### 4. 🎧 Speech to Text (Tun_STT)
-- **Technology**: Vosk Kaldi-based Recognition.
-- **Process**: Uses an optimized local Vosk model for low-latency, offline-capable transcription of Tunisian Darija.
+- **Technology**: OpenAI Whisper-small + Tunisian Bad-Word Filter.
+- **Process**: Uses the Whisper-small model (244M parameters) for high-accuracy transcription of Tunisian Darija, leveraging its multilingual Transformer architecture trained on 680k hours of diverse audio. The transcribed output is then passed through a **profanity filter** built from a curated Tunisian bad-word dataset (`.xlsx`) for safe content delivery.
 - **[Deep Dive Into Tun_STT](./Tun_STT/)**
 
 ---
@@ -77,22 +77,24 @@ The project includes a multi-module Streamlit dashboard located in the `/Demo` d
 
 ## 🛠️ Installation & Setup
 
+> [!IMPORTANT]
+> **Model Training Notebooks must be run on Google Colab.** The training pipelines for **STT**, **TTS**, and **SiTT** require at least **10 GB of VRAM** (GPU memory), and the necessary deep learning libraries come pre-installed in the Colab environment. The **TTSi** module does not require training — it runs directly as a Streamlit interface.
+
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/your-username/TuniSign-AI.git
    cd TuniSign-AI
    ```
 
-2. **Install core dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. **Train / export models** (on Google Colab):
+   - Open each module's notebook (`Tun_STT/`, `Tun_TTS/`, `Tun_SiTT/`) in Colab and run all cells.
+   - Download the resulting models and place them in the expected paths.
 
-3. **Install module-specific assets**:
+3. **Verify module-specific assets**:
    Ensure you have the following assets placed correctly:
-   - `Demo/signtotext/tunisl_v4.keras` (Sign model)
-   - `Demo/model/vosk-model` (Vosk model)
-   - `Demo/TextToSign/data/` (Avatar frame dataset)
+   - `Demo/signtotext/tunisl_v4.keras` (Sign model — from SiTT notebook)
+   - Whisper-small model (auto-downloaded on first run via `whisper.load_model("small")`)
+   - `Demo/TextToSign/data/` (Avatar frame dataset — used directly by TTSi)
 
 4. **Launch the platform**:
    ```bash

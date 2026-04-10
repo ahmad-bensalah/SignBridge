@@ -34,6 +34,20 @@ Standard 3D avatars often suffer from the "Uncanny Valley" and can distract from
 
 ---
 
+## 🛠️ How to Run
+
+> [!NOTE]
+> Unlike the other modules, **TTSi does not require running a training notebook**. This module is a **Streamlit-based interface** that uses pre-extracted landmark data directly.
+
+Simply launch the Streamlit demo and navigate to the **Avatar Synthesis** page:
+```bash
+cd Demo
+streamlit run app.py
+```
+The engine will automatically load the landmark dataset from `TextToSign/data/` and make all available signs discoverable via the sidebar.
+
+---
+
 ## 📂 Dataset Structure
 ```text
 TextToSign/data/

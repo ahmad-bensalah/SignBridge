@@ -34,10 +34,14 @@ Our custom pre-processing pipeline:
 
 ---
 
-## 🛠️ Deployment
+## 🛠️ How to Run
 
-- **Demo Integration**: The `app.py` script demonstrates the module's capabilities.
-- **Real-time Performance**: The model supports streaming synthesis, where audio chunks are played as they are generated, minimizing Time-to-First-Audio (TTFA).
+> [!IMPORTANT]
+> **Run the notebook on Google Colab.** The fine-tuning pipeline requires at least **10 GB of VRAM** (GPU memory), and the necessary libraries (Coqui TTS, PyTorch, etc.) come pre-installed in the Colab environment.
+
+1. Open the notebook located in this directory on **Google Colab**.
+2. Run all cells to fine-tune XTTS v2 on the TunArTTS corpus and export the model.
+3. The resulting model can then be used in the Streamlit demo for real-time synthesis.
 
 ---
 
