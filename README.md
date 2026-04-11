@@ -118,8 +118,6 @@ graph LR
     subgraph "☁️ Azure Cloud"
         Nginx["Nginx\nLoad Balancer"]
         STT1["STT Container\n(ACI)"]
-        STT2["STT Container\n(ACI)"]
-        TTS1["TTS Container\n(ACI)"]
         TTS2["TTS Container\n(ACI)"]
     end
 
