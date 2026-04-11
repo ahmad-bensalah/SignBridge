@@ -126,8 +126,6 @@ graph LR
     App -->|Audio stream| Nginx
     App -->|Text to speak| Nginx
     Nginx --> STT1
-    Nginx --> STT2
-    Nginx --> TTS1
     Nginx --> TTS2
 ```
 
