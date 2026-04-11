@@ -17,6 +17,36 @@ In Tunisia, the deaf community often faces significant hurdles due to the lack o
 
 ---
 
+## 🔍 How it Works: Step-by-Step
+
+### 🖐️ Sign to Text (Hearing the Signer)
+1. **Capture**: The app uses the camera to record the user's hand signs.
+2. **Skeleton Tracking**: Mediapipe "sees" the hands and maps out 21 key points (knuckles, fingertips).
+3. **Data Analysis**: These points are converted into numerical coordinates and angles.
+4. **Time Learning**: The AI watches how these numbers change over a 16-frame sequence.
+5. **Translation**: The system outputs a Tunisian word (e.g., "3aslema").
+
+### 🤟 Text to Sign (Showing the Sign Language)
+1. **Input**: A word is typed or received in Tunisian Darija.
+2. **Database Lookup**: The app finds the exact hand-movement data for that word.
+3. **Skeleton Rendering**: The "Neon Avatar" uses those points to move its limbs.
+4. **Visual Synthesis**: The movements are smoothed out to look like a real person signing.
+5. **Display**: The deaf user sees the glowing skeleton sign the message visually.
+
+### 🗣️ Text to Speech (The App's Voice)
+1. **Text Normalization**: Tunisian text is cleaned so the AI knows how to pronounce loanwords.
+2. **AI Voice Processing**: The XTTS model takes the text and generates a human-like voice.
+3. **Emotion & Accent**: The model maintains a natural Tunisian accent and prosody.
+4. **Audio Output**: The hearing person hears the sign language translated into spoken Darija.
+
+### 🎧 Speech to Text (Understanding the Speaker)
+1. **Audio Input**: The hearing person speaks Tunisian Darija into the microphone.
+2. **Deep Listening**: Whisper-small analyzes the sound waves and recognizes the dialect.
+3. **Bad-Word Filter**: For safety, the system checks for and censors any offensive language.
+4. **Text Display**: The deaf person sees the spoken words appear as clear text on their screen.
+
+---
+
 ## 🏗️ Technical Architecture
 
 ```mermaid
