@@ -1,8 +1,11 @@
 import io
 import json
+import os
 import wave
+import zipfile
 from pathlib import Path
 
+import requests
 import streamlit as st
 from vosk import KaldiRecognizer, Model, SetLogLevel
 from ui_theme import apply_tunisign_theme, render_primary_sidebar
@@ -47,6 +50,62 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 apply_tunisign_theme()
+
+# ── Model download URL & paths ────────────────────────────────
+HF_MODEL_URL = (
+    "https://huggingface.co/Sali7a8603/Tunisian_STT/resolve/main/STT_Tun_Model.zip"
+)
+MODEL_DIR = Path(__file__).resolve().parents[1] / "model"
+DEFAULT_MODEL_PATH = MODEL_DIR / "whisper-tts-model"
+MODEL_ZIP_PATH = MODEL_DIR / "STT_Tun_Model.zip"
+
+
+def download_model(destination: Path) -> None:
+    """Download and extract the Whisper-TTS model from HuggingFace."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    st.info("⬇️ Downloading Tunisian STT model from HuggingFace (≈ 542 MB)…")
+    progress_bar = st.progress(0, text="Starting download…")
+
+    with requests.get(HF_MODEL_URL, stream=True, timeout=600) as resp:
+        resp.raise_for_status()
+        total = int(resp.headers.get("content-length", 0))
+        downloaded = 0
+
+        with open(MODEL_ZIP_PATH, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total:
+                    pct = min(downloaded / total, 1.0)
+                    progress_bar.progress(
+                        pct,
+                        text=f"Downloaded {downloaded / 1e6:.0f} / {total / 1e6:.0f} MB",
+                    )
+
+    progress_bar.progress(1.0, text="Extracting model…")
+
+    with zipfile.ZipFile(MODEL_ZIP_PATH, "r") as zf:
+        zf.extractall(destination.parent)
+
+    # The zip may extract into a subfolder — find and rename it
+    extracted_dirs = [
+        d for d in destination.parent.iterdir()
+        if d.is_dir() and d.name not in ("whisper-tts-model",)
+    ]
+    # If the zip extracted a single folder (e.g. "STT_Tun_Model"), rename it
+    if not destination.exists() and extracted_dirs:
+        for d in extracted_dirs:
+            # Check if it contains model files (conf/, am/, graph/, etc.)
+            if any((d / sub).exists() for sub in ("conf", "am", "graph", "ivector")):
+                d.rename(destination)
+                break
+
+    # Clean up the zip
+    MODEL_ZIP_PATH.unlink(missing_ok=True)
+
+    progress_bar.empty()
+    st.success("✅ Model downloaded and extracted successfully!")
 
 
 def transcribe_wav(audio_bytes, model):
@@ -95,18 +154,16 @@ def load_model(model_path):
     return Model(model_path)
 
 
-default_model_path = Path(__file__).resolve().parents[1] / "model" / "vosk-model"
-
 with st.sidebar:
     render_primary_sidebar(show_caption=False)
     st.markdown("---")
     st.header("STT Settings")
-    model_path = st.text_input("Vosk model path", value=str(default_model_path))
-    st.caption("Expected folder: tts/model/vosk-model")
+    model_path = st.text_input("Whisper model path", value=str(DEFAULT_MODEL_PATH))
+    st.caption("Expected folder: Demo/model/whisper-tts-model")
 
 
 st.title("Speech to Text")
-st.caption("Upload or record WAV audio and transcribe with local Vosk model.")
+st.caption("Upload or record WAV audio and transcribe with the Tunisian Whisper-TTS model.")
 
 if "stt_transcript" not in st.session_state:
     st.session_state["stt_transcript"] = ""
@@ -130,27 +187,35 @@ with left_col:
     if transcribe_clicked:
         if selected_audio is None:
             st.error("Please upload or record a WAV audio file first.")
-        elif not Path(model_path).exists():
-            st.error(f"Model folder not found: {model_path}")
         else:
-            try:
-                model = load_model(model_path)
-                audio_bytes = selected_audio.read()
-                transcript, details = transcribe_wav(audio_bytes, model)
-                st.session_state["stt_transcript"] = transcript
-                st.session_state["stt_details"] = details
+            # Auto-download model if it doesn't exist
+            if not Path(model_path).exists():
+                try:
+                    download_model(Path(model_path))
+                except Exception as dl_err:
+                    st.error(f"Failed to download model: {dl_err}")
 
-                if transcript:
-                    st.success("Transcription complete.")
-                else:
-                    st.warning("No speech was recognized. Try clearer audio.")
+            if Path(model_path).exists():
+                try:
+                    model = load_model(model_path)
+                    audio_bytes = selected_audio.read()
+                    transcript, details = transcribe_wav(audio_bytes, model)
+                    st.session_state["stt_transcript"] = transcript
+                    st.session_state["stt_details"] = details
 
-            except wave.Error:
-                st.error("Invalid WAV file. Please provide a valid WAV (PCM mono, 16-bit).")
-            except ValueError as err:
-                st.error(str(err))
-            except Exception as err:
-                st.error(f"STT error: {err}")
+                    if transcript:
+                        st.success("Transcription complete.")
+                    else:
+                        st.warning("No speech was recognized. Try clearer audio.")
+
+                except wave.Error:
+                    st.error("Invalid WAV file. Please provide a valid WAV (PCM mono, 16-bit).")
+                except ValueError as err:
+                    st.error(str(err))
+                except Exception as err:
+                    st.error(f"STT error: {err}")
+            else:
+                st.error(f"Model folder not found: {model_path}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right_col:

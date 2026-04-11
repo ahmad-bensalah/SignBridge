@@ -104,10 +104,63 @@ The project includes a multi-module Streamlit dashboard located in the `/Demo` d
 
 ---
 
+## 🚢 Deployment
+
+SignBridge uses a **hybrid deployment** strategy that balances latency, cost, and scalability by splitting workloads between the mobile device and the cloud.
+
+```mermaid
+graph LR
+    subgraph "📱 On-Device (Local)"
+        TTSi["Text-to-Sign\n(~4 MB)"]
+        SiTT["Sign-to-Text\n(~6 MB)"]
+    end
+
+    subgraph "☁️ Azure Cloud"
+        Nginx["Nginx\nLoad Balancer"]
+        STT1["STT Container\n(ACI)"]
+        STT2["STT Container\n(ACI)"]
+        TTS1["TTS Container\n(ACI)"]
+        TTS2["TTS Container\n(ACI)"]
+    end
+
+    App["Mobile App"] -->|Sign frames| SiTT
+    App -->|Text input| TTSi
+    App -->|Audio stream| Nginx
+    App -->|Text to speak| Nginx
+    Nginx --> STT1
+    Nginx --> STT2
+    Nginx --> TTS1
+    Nginx --> TTS2
+```
+
+### Local Modules (On-Device)
+
+| Module | Size | Why Local? |
+|--------|------|------------|
+| **Text-to-Sign (TTSi)** | ~4 MB | Concatenative lookup from a pre-built landmark dataset — no GPU needed. |
+| **Sign-to-Text (SiTT)** | ~6 MB | Lightweight Keras TDNN + Mediapipe hand-landmarker runs comfortably on mobile CPUs. |
+
+> **Total on-device footprint ≈ 10 MB** — small enough to ship inside the APK, eliminating network round-trips and enabling offline sign recognition.
+
+### Cloud Modules (Azure Container Instances)
+
+| Module | Image | Why Cloud? |
+|--------|-------|------------|
+| **Speech-to-Text (STT)** | `tunisign-stt:latest` | Whisper model (~500 MB) requires significant memory; benefits from GPU-backed ACI. |
+| **Text-to-Speech (TTS)** | `tunisign-tts:latest` | XTTS v2 inference is compute-intensive; horizontally scaled behind the load balancer. |
+
+Each module is containerised with its own `Dockerfile` and exposed as a **FastAPI** REST endpoint. **Nginx** sits in front as a reverse-proxy / load balancer, distributing requests across multiple ACI replicas to ensure:
+
+- **Horizontal scalability** — spin up additional replicas during peak demand.
+- **High availability** — health-checked containers are automatically replaced on failure.
+- **Low latency** — geographically co-located with the target user base (Azure West Europe / North Africa).
+
+---
+
 ## 🤝 Acknowledgments
 - **TunArTTS Corpus**: For providing the foundation for Tunisian speech tasks.
-- **Mediapipe**: For the robust landmark extraction framework.
-- **Coqui-AI**: For the XTTS v2 architecture.
+- **Lingora**: For the Tunisian Transcripted Audios dataset.
+- **ATILS (Association tunisienne des interprètes en langue des signes)**: For the Tunisian Sign Language dataset.
 
 ---
 <p align="center">

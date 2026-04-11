@@ -1,10 +1,12 @@
 import json
 import html
 import io
+import os
 import re
 import tempfile
 import time
 import wave
+import zipfile
 from collections import deque
 from pathlib import Path
 
@@ -35,15 +37,17 @@ except Exception as import_error:
     st.caption(f"Import error: {import_error}")
     st.stop()
 
+import requests as http_requests
+
 try:
     from vosk import KaldiRecognizer, Model, SetLogLevel
 
     SetLogLevel(-1)
-    VOSK_IMPORT_ERROR = None
-except Exception as vosk_import_error:
+    WHISPER_IMPORT_ERROR = None
+except Exception as whisper_import_error:
     KaldiRecognizer = None
     Model = None
-    VOSK_IMPORT_ERROR = vosk_import_error
+    WHISPER_IMPORT_ERROR = whisper_import_error
 
 API_KEY = "sk_dc270b6a089f34d50834bf3e207addaee1082463f7bd4a84"
 VOICE_ID = "InB4o9iYj3MQ4HtGs2KV"
@@ -52,7 +56,54 @@ ASSET_DIR = Path(__file__).resolve().parents[1] / "signtotext"
 MODEL_PATH = ASSET_DIR / "tunisl_v4.keras"
 LABELS_PATH = ASSET_DIR / "tunisl_v4_labels.json"
 LANDMARKER_PATH = ASSET_DIR / "hand_landmarker.task"
-VOSK_MODEL_PATH = Path(__file__).resolve().parents[1] / "model" / "vosk-model"
+
+# ── Whisper-TTS STT model paths & download URL ───────────────
+HF_MODEL_URL = (
+    "https://huggingface.co/Sali7a8603/Tunisian_STT/resolve/main/STT_Tun_Model.zip"
+)
+WHISPER_MODEL_DIR = Path(__file__).resolve().parents[1] / "model"
+WHISPER_MODEL_PATH = WHISPER_MODEL_DIR / "whisper-tts-model"
+WHISPER_MODEL_ZIP = WHISPER_MODEL_DIR / "STT_Tun_Model.zip"
+
+
+def _ensure_whisper_model() -> bool:
+    """Download and extract the Whisper-TTS model if it is not already present."""
+    if WHISPER_MODEL_PATH.exists():
+        return True
+    try:
+        WHISPER_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        st.info("⬇️ Downloading Tunisian STT model from HuggingFace (≈ 542 MB)…")
+        progress = st.progress(0, text="Starting download…")
+        with http_requests.get(HF_MODEL_URL, stream=True, timeout=600) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            downloaded = 0
+            with open(WHISPER_MODEL_ZIP, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        progress.progress(
+                            min(downloaded / total, 1.0),
+                            text=f"Downloaded {downloaded / 1e6:.0f} / {total / 1e6:.0f} MB",
+                        )
+        progress.progress(1.0, text="Extracting model…")
+        with zipfile.ZipFile(WHISPER_MODEL_ZIP, "r") as zf:
+            zf.extractall(WHISPER_MODEL_DIR)
+        # Rename extracted folder if needed
+        if not WHISPER_MODEL_PATH.exists():
+            for d in WHISPER_MODEL_DIR.iterdir():
+                if d.is_dir() and d.name != "whisper-tts-model":
+                    if any((d / s).exists() for s in ("conf", "am", "graph", "ivector")):
+                        d.rename(WHISPER_MODEL_PATH)
+                        break
+        WHISPER_MODEL_ZIP.unlink(missing_ok=True)
+        progress.empty()
+        st.success("✅ Model downloaded and extracted successfully!")
+        return WHISPER_MODEL_PATH.exists()
+    except Exception as dl_err:
+        st.error(f"Failed to download Whisper-TTS model: {dl_err}")
+        return False
 
 WINDOW_SIZE = 16
 DEFAULT_SIGN_CONFIDENCE = 0.55
@@ -183,7 +234,7 @@ def transcribe_wav(audio_bytes, model):
 
 
 @st.cache_resource
-def load_vosk_model(model_path):
+def load_whisper_model(model_path):
     return Model(model_path)
 
 
@@ -842,7 +893,7 @@ with main_compose_col:
                 st.rerun()
 
     elif input_mode == "Voice":
-        st.caption("Voice is transcribed to text with Vosk, then converted to sign output.")
+        st.caption("Voice is transcribed to text with the Whisper-TTS model, then converted to sign output.")
         recorded_audio = st.audio_input(
             "Record voice message",
             key=f"compose_voice_audio_{st.session_state.compose_voice_nonce}",
@@ -854,46 +905,50 @@ with main_compose_col:
         if st.button("Send Voice", type="primary", use_container_width=True):
             if recorded_audio is None:
                 st.warning("Please record a voice message first.")
-            elif VOSK_IMPORT_ERROR is not None:
-                st.error(f"Vosk dependency is not available: {VOSK_IMPORT_ERROR}")
-            elif not VOSK_MODEL_PATH.exists():
-                st.error(f"Vosk model not found at: {VOSK_MODEL_PATH}")
+            elif WHISPER_IMPORT_ERROR is not None:
+                st.error(f"Whisper-TTS dependency is not available: {WHISPER_IMPORT_ERROR}")
             else:
-                try:
-                    with st.spinner("Transcribing voice..."):
-                        vosk_model = load_vosk_model(str(VOSK_MODEL_PATH))
-                        transcript = transcribe_wav(recorded_audio.getvalue(), vosk_model)
-                except wave.Error:
-                    st.error("Recorded audio is not valid WAV PCM for Vosk transcription.")
-                    transcript = ""
-                except Exception as stt_error:
-                    st.error(f"Speech-to-text error: {stt_error}")
-                    transcript = ""
-
-                if transcript:
-                    caption_text = voice_caption.strip()
-                    payload_text = transcript
-                    if caption_text:
-                        payload_text = f"Transcript: {transcript}\nCaption: {caption_text}"
-                    payload_text = sanitize_chat_text(payload_text)
-
-                    parsed_sign = translate_text_to_sign_tokens(transcript)
-
-                    st.session_state.conversation_history.append(
-                        {
-                            "type": "normal_voice",
-                            "sender": "normal",
-                            "text": payload_text,
-                            "audio": recorded_audio.getvalue(),
-                            "sign_script": parsed_sign.get("script", ""),
-                            "sign_tokens": parsed_sign.get("tokens", []),
-                            "created_at": time.time(),
-                        }
-                    )
-                    st.session_state.compose_voice_nonce += 1
-                    st.rerun()
+                # Auto-download model if missing
+                if not WHISPER_MODEL_PATH.exists():
+                    _ensure_whisper_model()
+                if not WHISPER_MODEL_PATH.exists():
+                    st.error(f"Whisper-TTS model not found at: {WHISPER_MODEL_PATH}")
                 else:
-                    st.warning("No speech transcript detected. Please speak clearly and try again.")
+                    try:
+                        with st.spinner("Transcribing voice..."):
+                            whisper_model = load_whisper_model(str(WHISPER_MODEL_PATH))
+                            transcript = transcribe_wav(recorded_audio.getvalue(), whisper_model)
+                    except wave.Error:
+                        st.error("Recorded audio is not valid WAV PCM for Whisper transcription.")
+                        transcript = ""
+                    except Exception as stt_error:
+                        st.error(f"Speech-to-text error: {stt_error}")
+                        transcript = ""
+
+                    if transcript:
+                        caption_text = voice_caption.strip()
+                        payload_text = transcript
+                        if caption_text:
+                            payload_text = f"Transcript: {transcript}\nCaption: {caption_text}"
+                        payload_text = sanitize_chat_text(payload_text)
+
+                        parsed_sign = translate_text_to_sign_tokens(transcript)
+
+                        st.session_state.conversation_history.append(
+                            {
+                                "type": "normal_voice",
+                                "sender": "normal",
+                                "text": payload_text,
+                                "audio": recorded_audio.getvalue(),
+                                "sign_script": parsed_sign.get("script", ""),
+                                "sign_tokens": parsed_sign.get("tokens", []),
+                                "created_at": time.time(),
+                            }
+                        )
+                        st.session_state.compose_voice_nonce += 1
+                        st.rerun()
+                    else:
+                        st.warning("No speech transcript detected. Please speak clearly and try again.")
 
     elif input_mode == "Camera":
         st.markdown('<div class="section-title">Live camera sign capture</div>', unsafe_allow_html=True)

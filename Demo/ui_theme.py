@@ -3,7 +3,7 @@ import streamlit as st
 
 PAGE_LINKS = [
     ("app.py", "Text to Speech", "🔊"),
-    ("pages/2_STT_Vosk.py", "Speech to Text", "🎧"),
+    ("pages/2_STT_Whisper.py", "Speech to Text", "🎧"),
     ("pages/3_Sign_to_Text.py", "Sign to Text", "🖐️"),
     ("pages/4_Text_to_Sign.py", "Text to Sign", "🤟"),
     ("pages/5_Conversation_Bridge.py", "Conversation Bridge", "💬"),
